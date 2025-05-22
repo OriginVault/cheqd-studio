@@ -14,8 +14,6 @@ services:
         # For development/staging release, use ":staging-latest"
         image: ghcr.io/cheqd/studio:latest
         depends_on:
-            postgres:
-                condition: service_healthy
             app-migrations:
                 condition: service_completed_successfully
         ports:
@@ -32,34 +30,9 @@ services:
     # Only relevant if you're using the app with EXTERNAL_DB=true
     app-migrations:
         image: ghcr.io/cheqd/studio:latest
-        depends_on:
-            postgres:
-                condition: service_healthy
         env_file:
             - with-db.env
         entrypoint: ['npm', 'run', 'migration']
         profiles:
             - app-setup
-            - external-kms
-
-    # This service is used to run a PostgreSQL database
-    # Used in the following scenarios:
-    # 1. When you're using the app with EXTERNAL_DB=true
-    postgres:
-        image: postgres:15-alpine
-        user: postgres
-        volumes:
-            - ./pg-init-scripts:/docker-entrypoint-initdb.d
-        ports:
-            - 5432:5432
-        # Edit the environment variables in postgres.env to change the database name, username, password, etc.
-        # Postgres setup and configuration is outside the scope of this file.
-        env_file:
-            - postgres.env
-        healthcheck:
-            test: ['CMD-SHELL', 'pg_isready']
-            interval: 10s
-            timeout: 5s
-            retries: 5
-        profiles:
             - external-kms
