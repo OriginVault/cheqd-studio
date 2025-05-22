@@ -73,6 +73,8 @@ export interface IPresentationTrack extends IBaseTrack {
 export interface IKeyTrack extends IBaseTrack {
 	keyRef: string;
 	keyType: string;
+	includesPrivateKey?: boolean;
+	encrypted?: boolean;
 }
 
 export interface ITrackResult {

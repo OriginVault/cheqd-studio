@@ -126,6 +126,7 @@ export enum OperationNameEnum {
 	// Key operations
 	KEY_CREATE = 'key-create',
 	KEY_IMPORT = 'key-import',
+	KEY_EXPORT = 'key-export',
 	KEY_READ = 'key-read',
 	// Presentation operations
 	PRESENTATION_CREATE = 'presentation-create',

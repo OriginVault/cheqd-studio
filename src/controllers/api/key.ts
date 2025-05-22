@@ -19,6 +19,7 @@ import type { IKeyTrack, ITrackOperation } from '../../types/track.js';
 import { OperationCategoryNameEnum, OperationNameEnum } from '../../types/constants.js';
 import { validate } from '../validator/decorator.js';
 import { SupportedKeyTypes } from '@veramo/utils';
+import crypto from 'crypto';
 
 // ToDo: Make the format of /key/create and /key/read the same
 // ToDo: Add valdiation for /key/import
@@ -56,6 +57,24 @@ export class KeyController {
 		check('salt').optional().isHexadecimal().withMessage('salt should be a hexadecimal string').bail(),
 		check('type').optional().isString().withMessage('type should be a string').bail(),
 		check('alias').optional().isString().withMessage('alias should be a string').bail(),
+	];
+	public static keyExportValidator = [
+		check('kid')
+			.exists()
+			.withMessage('keyId was not provided')
+			.isHexadecimal()
+			.withMessage('keyId should be a hexadecimal string')
+			.bail(),
+		check('includePrivateKey')
+			.optional()
+			.isBoolean()
+			.withMessage('includePrivateKey should be a boolean')
+			.bail(),
+		check('encrypt')
+			.optional()
+			.isBoolean()
+			.withMessage('encrypt should be a boolean')
+			.bail(),
 	];
 	/**
 	 * @openapi
@@ -273,6 +292,150 @@ export class KeyController {
 			return response.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
 				error: `${error}`,
 			} satisfies UnsuccessfulQueryKeyResponseBody);
+		}
+	}
+
+	/**
+	 * @openapi
+	 *
+	 * /key/export:
+	 *   post:
+	 *     tags: [ Key ]
+	 *     summary: Export an identity key.
+	 *     description: This endpoint exports an identity key associated with the user's account. Can optionally include the private key data and encrypt it.
+	 *     requestBody:
+	 *       content:
+	 *         application/x-www-form-urlencoded:
+	 *           schema:
+	 *             $ref: '#/components/schemas/KeyExportRequest'
+	 *         application/json:
+	 *           schema:
+	 *             $ref: '#/components/schemas/KeyExportRequest'
+	 *     responses:
+	 *       200:
+	 *         description: The request was successful.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/KeyExportResponse'
+	 *       400:
+	 *         description: A problem with the input fields has occurred. Additional state information plus metadata may be available in the response body.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/InvalidRequest'
+	 *             example:
+	 *               error: InvalidRequest
+	 *       401:
+	 *         $ref: '#/components/schemas/UnauthorizedError'
+	 *       404:
+	 *         description: The requested key was not found.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/InvalidRequest'
+	 *             example:
+	 *               error: Key not found
+	 *       500:
+	 *         description: An internal error has occurred. Additional state information plus metadata may be available in the response body.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/InvalidRequest'
+	 *             example:
+	 *               error: Internal Error
+	 */
+	@validate
+	public async exportKey(request: Request, response: Response) {
+		const { kid, includePrivateKey = false, encrypt = false, password } = request.body;
+		
+		// Get strategy e.g. postgres or local
+		const identityServiceStrategySetup = new IdentityServiceStrategySetup(response.locals.customer.customerId);
+		
+		try {
+			// First check if the key exists
+			const key = await identityServiceStrategySetup.agent.getKey(kid, response.locals.customer);
+			
+			if (!key) {
+				return response.status(StatusCodes.NOT_FOUND).json({
+					error: `Key with kid: ${kid} not found`,
+				});
+			}
+			
+			// Prepare the export data
+			const exportData: any = {
+				kid: key.kid,
+				type: key.type,
+				publicKeyHex: key.publicKeyHex,
+				meta: key.meta,
+			};
+			
+			// Include private key if requested
+			if (includePrivateKey) {
+				// Get the private key data
+				const privateKeyData = await identityServiceStrategySetup.agent.exportKey(
+					kid, 
+					response.locals.customer
+				);
+				
+				if (!privateKeyData || !privateKeyData.privateKeyHex) {
+					return response.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+						error: 'Failed to retrieve private key data',
+					});
+				}
+				
+				// If encryption is requested, encrypt the private key
+				if (encrypt) {
+					if (!password) {
+						return response.status(StatusCodes.BAD_REQUEST).json({
+							error: 'Password is required for encryption',
+						});
+					}
+
+					// Use the password to derive a key for encryption
+					const salt = crypto.randomBytes(16).toString('hex');
+					const ivHex = crypto.randomBytes(16).toString('hex');
+					const keyBuffer = crypto.scryptSync(password, salt, 32);
+
+					// Encrypt the private key using the derived key
+					const cipher = crypto.createCipheriv(
+						'aes-256-cbc' as any, 
+						keyBuffer as any, 
+						Buffer.from(ivHex, 'hex') as any
+					);
+					let encryptedPrivateKeyHex = cipher.update(privateKeyData.privateKeyHex, 'hex', 'hex');
+					encryptedPrivateKeyHex += cipher.final('hex');
+
+					exportData.privateKeyHex = encryptedPrivateKeyHex;
+					exportData.encrypted = true;
+					exportData.ivHex = ivHex;
+					exportData.salt = salt;
+				} else {
+					exportData.privateKeyHex = privateKeyData.privateKeyHex;
+					exportData.encrypted = false;
+				}
+			}
+			
+			// Track the operation
+			eventTracker.emit('track', {
+				name: OperationNameEnum.KEY_EXPORT,
+				category: OperationCategoryNameEnum.KEY,
+				customer: response.locals.customer,
+				user: response.locals.user,
+				data: {
+					keyRef: key.kid,
+					keyType: key.type,
+					includesPrivateKey: includePrivateKey,
+					encrypted: encrypt && includePrivateKey,
+				} satisfies IKeyTrack,
+			} satisfies ITrackOperation);
+			
+			// Return the response
+			return response.status(StatusCodes.OK).json(exportData);
+		} catch (error) {
+			return response.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+				error: `Internal error: ${(error as Error)?.message || error}`,
+			});
 		}
 	}
 }

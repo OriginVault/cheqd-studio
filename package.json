@@ -107,6 +107,7 @@
 		"uri-js": "^4.4.1"
 	},
 	"devDependencies": {
+		"@originvault/ov-types": "^0.0.1-alpha.0",
 		"@playwright/test": "^1.52.0",
 		"@semantic-release/changelog": "^6.0.3",
 		"@semantic-release/commit-analyzer": "^13.0.1",

@@ -182,9 +182,13 @@ export class Veramo {
 			privateKeyHex,
 		});
 	}
-
+	
 	async getKey(agent: TAgent<IKeyManager>, kid: string) {
 		return await agent.keyManagerGet({ kid });
+	}
+
+	async exportKey(agent: TAgent<IKeyManager>, kid: string) {
+		return await agent.keyManagerExport({ kid });
 	}
 
 	async createDid(agent: TAgent<IDIDManager>, network: string, didDocument: DIDDocument): Promise<IIdentifier> {
