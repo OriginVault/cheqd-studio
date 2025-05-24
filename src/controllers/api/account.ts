@@ -185,15 +185,15 @@ export class AccountController {
 		const status = BootStrapAccountResponse.initialize();
 
 		// 1. Get logTo UserId from request body
-		if (!request.body.user || !request.body.user.id || !request.body.user.primaryEmail) {
+		if (!request.body.data || !request.body.data.id || !request.body.data.primaryEmail) {
 			return response.status(StatusCodes.BAD_REQUEST).json({
 				error: 'User id is not specified or primaryEmail is not set',
 			} satisfies UnsuccessfulResponseBody);
 		}
-		const logToUserId = request.body.user.id;
-		const logToUserEmail = request.body.user.primaryEmail;
+		const logToUserId = request.body.data.id;
+		const logToUserEmail = request.body.data.primaryEmail;
 		// use email as name, because "name" is unique in the current db setup.
-		const logToName = request.body.user.name || logToUserEmail;
+		const logToName = request.body.data.name || logToUserEmail;
 
 		const stripe = response.locals.stripe as Stripe;
 		const logToHelper = new LogToHelper();
