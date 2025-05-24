@@ -12,14 +12,14 @@ services:
         # To change the image version, edit the ":latest" tag to the desired version
         # For production/stable release, use ":latest"
         # For development/staging release, use ":staging-latest"
-        image: ghcr.io/cheqd/studio:latest
+        image: ghcr.io/cheqd/studio:sha-fb59dfb12cdc3d3057d20eb859178a375d7fedac
         depends_on:
             app-migrations:
                 condition: service_completed_successfully
         ports:
             - 3000:3000
         env_file:
-            - with-db.env
+            - ../../../with-db.env
         healthcheck:
             test: ['CMD', 'wget', '--quiet', '--spider', 'http://localhost:3000/swagger']
             interval: 10s
@@ -29,10 +29,10 @@ services:
     # This service is used as a ONE-TIME setup service to run migrations
     # Only relevant if you're using the app with EXTERNAL_DB=true
     app-migrations:
-        image: ghcr.io/cheqd/studio:latest
+        image: ghcr.io/cheqd/studio:sha-fb59dfb12cdc3d3057d20eb859178a375d7fedac
         env_file:
-            - with-db.env
-        entrypoint: ['npm', 'run', 'migration']
+            - ../../../with-db.env
+        entrypoint: ['npm', 'run', 'migrate']
         profiles:
             - app-setup
             - external-kms
