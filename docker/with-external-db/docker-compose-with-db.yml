@@ -19,7 +19,7 @@ services:
         ports:
             - 3000:3000
         env_file:
-            - ../../../with-db.env
+            - ~/cheqd-studio.env
         healthcheck:
             test: ['CMD', 'wget', '--quiet', '--spider', 'http://localhost:3000/swagger']
             interval: 10s
@@ -31,7 +31,7 @@ services:
     app-migrations:
         image: ghcr.io/cheqd/studio:sha-fb59dfb12cdc3d3057d20eb859178a375d7fedac
         env_file:
-            - ../../../with-db.env
+            - ~/cheqd-studio.env
         entrypoint: ['npm', 'run', 'migrate']
         profiles:
             - app-setup
