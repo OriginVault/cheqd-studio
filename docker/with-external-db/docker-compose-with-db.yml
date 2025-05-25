@@ -22,6 +22,8 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5
+        networks:
+            - logto-network
 
     # This service is used as a ONE-TIME setup service to run migrations
     # Only relevant if you're using the app with EXTERNAL_DB=true
@@ -33,3 +35,7 @@ services:
     #     profiles:
     #         - app-setup
     #         - external-kms
+
+networks:
+    logto-network:
+        external: true

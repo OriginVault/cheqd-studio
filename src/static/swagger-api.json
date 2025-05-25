@@ -3,7 +3,7 @@
   "info": {
     "title": "OriginVault's Cheqd Studio API for cheqd network",
     "version": "2.0.0",
-    "description": "API service to create and manage DIDs, Verifiable Credentials, and DID-Linked Resources",
+    "description": "API service to create and manage DIDs, Verifiable Credentials, and DID-Linked Resources through OriginVault's Cheqd Studio",
     "contact": {
       "name": "OriginVault",
       "url": "https://originvault.com",
@@ -3966,6 +3966,83 @@
           },
           "401": {
             "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "500": {
+            "description": "An internal error has occurred. Additional state information plus metadata may be available in the response body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                },
+                "example": {
+                  "error": "Internal Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/key/export": {
+      "post": {
+        "tags": [
+          "Key"
+        ],
+        "summary": "Export an identity key.",
+        "description": "This endpoint exports an identity key associated with the user's account. Can optionally include the private key data and encrypt it.",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyExportRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request was successful.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyExportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A problem with the input fields has occurred. Additional state information plus metadata may be available in the response body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                },
+                "example": {
+                  "error": "InvalidRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "404": {
+            "description": "The requested key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                },
+                "example": {
+                  "error": "Key not found"
+                }
+              }
+            }
           },
           "500": {
             "description": "An internal error has occurred. Additional state information plus metadata may be available in the response body.",
