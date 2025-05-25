@@ -8,10 +8,14 @@ FROM node:20-alpine AS builder
 WORKDIR /home/node/app
 
 # Copy source
-COPY . .
+COPY ../package.json ../package-lock.json ./
 
 # Installing dependencies
-RUN npm ci
+RUN npm install 
+
+RUN npm install -g swagger-jsdoc
+
+COPY . .
 
 # Build the app
 RUN npm run build
@@ -37,12 +41,10 @@ RUN apk update && \
 COPY --from=builder --chown=node:node /home/node/app/*.json /home/node/app/*.md ./
 COPY --from=builder --chown=node:node /home/node/app/dist ./dist
 
-# Install production dependencies
-RUN npm ci
-
 # Base arguments: build-time
 ARG NPM_CONFIG_LOGLEVEL=warn
 ARG PORT=3000
+ARG APPLICATION_BASE_URL
 
 # Network API endpoints: build-time
 ARG MAINNET_RPC_URL=https://rpc.cheqd.net:443
