@@ -56,4 +56,16 @@ export class KeyService {
 	public fromVeramoKey(key: Key) {
 		return new KeyEntity(key.kid, key.type, key.publicKeyHex);
 	}
+
+	public async listKeys(customer: CustomerEntity) {
+		try {
+			return await this.keyRepository.find({
+				where: { customer },
+			});
+		} catch (error) {
+			console.error(error);
+			return [];
+		}
+
+	}
 }

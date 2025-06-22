@@ -7,10 +7,10 @@ import { VerificationMethodValidator } from './verification-method.js';
 import { CreateDIDDocumentServiceValidator } from './service-create-request.js';
 import type { CreateDIDService } from '../../types/validation.js';
 import { ServiceValidator } from './service.js';
-import { DIDArrayValidator } from './did-array.js';
 import { CheqdDidLinkedAlsoKnownAsValidator } from './resource-also-known-as.js';
 import { CheqdW3CVerifiableCredentialValidator } from './credential.js';
 import { CheqdW3CVerifiablePresentationValidator } from './presentation.js';
+import { DIDDocumentSectionIDValidator } from './did-document-section-id.js';
 
 export const { check, validationResult, query, param, body } = new ExpressValidator({
 	isDID: (value: Validatable) => {
@@ -21,7 +21,7 @@ export const { check, validationResult, query, param, body } = new ExpressValida
 		return true;
 	},
 	isDIDArray: (value: Validatable) => {
-		const res = new DIDArrayValidator().validate(value);
+		const res = new DIDDocumentSectionIDValidator().validate(value);
 		if (!res.valid) {
 			throw new Error(res.error);
 		}

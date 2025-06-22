@@ -38,6 +38,8 @@ export async function arePublicKeyHexsInWallet(
 		} satisfies IBooleanResponse;
 	}
 	const ownedPublicKeysHexs = ownedKeys.map((key) => key.publicKeyHex);
+	console.log('ownedPublicKeysHexs', ownedPublicKeysHexs);
+	console.log('publicKeyHexs', publicKeyHexs);
 	const notOwnedPublicKeysHexs = publicKeyHexs.filter((key) => !ownedPublicKeysHexs.includes(key));
 	if (notOwnedPublicKeysHexs.length > 0) {
 		return {
@@ -49,6 +51,7 @@ export async function arePublicKeyHexsInWallet(
 }
 
 export function toTPublicKeyEd25519(publicKeyHex: string): TPublicKeyEd25519 {
+	console.log('toTPublicKeyEd25519:publicKeyHex?', publicKeyHex);
 	return {
 		type: 'Ed25519',
 		publicKeyHex: publicKeyHex,

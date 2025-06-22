@@ -19,6 +19,9 @@ import { fromString } from 'uint8arrays';
 
 import { config } from 'dotenv';
 import { DIDUrlParams, isDidAndResourceId, isDidAndResourceName, isDidUrl } from '../types/accreditation.js';
+import path from 'path';
+import fs from 'fs';
+import * as multibase from 'multibase';
 
 config();
 
@@ -213,30 +216,59 @@ export async function deriveSymmetricKeyFromSecret(
 	return derivedKey;
 }
 
-export async function decryptPrivateKey(encryptedPrivateKeyHex: string, ivHex: string, salt: string) {
+export async function decryptPrivateKey(encryptedPrivateKeyHex: string, ivHex: string, salt: string, publicKeyHex?: string) {
+	if(publicKeyHex) {
+		const publicKey = multibase.decode(publicKeyHex);
+		const base64Key = Buffer.from(publicKey).toString('base64');
+		const derivedKey = await deriveSymmetricKeyFromSecret(base64Key, salt);
+		const encryptedKey = Buffer.from(encryptedPrivateKeyHex, 'hex');
+		const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: Buffer.from(ivHex, 'hex') }, derivedKey, encryptedKey);
+		return new Uint8Array(decrypted);
+	}
+	const didDocPath = path.join(process.cwd(), '/public/.well-known/did-configuration.json');
+	if (!fs.existsSync(didDocPath)) {
+		throw new Error('Did doc not found');
+	}
+	const didDoc: { didDocument: DIDDocument } = JSON.parse(fs.readFileSync(didDocPath, 'utf8'));
+	const publicKey = didDoc.didDocument.verificationMethod?.[0]?.publicKeyMultibase;
+	if (!publicKey) {
+		throw new Error('Missing public key');
+	}
+	console.log('publicKey', publicKey, publicKeyHex);
 	if (!process.env.CREDS_DECRYPTION_SECRET) {
 		throw new Error('Missing encryption secret');
 	}
-	// derive key from passphrase
-	const derivedKey = await deriveSymmetricKeyFromSecret(process.env.CREDS_DECRYPTION_SECRET, salt);
 
-	// unwrap encrypted key with iv
-	const encryptedKey = Buffer.from(encryptedPrivateKeyHex, 'hex');
-	const iv = Buffer.from(ivHex, 'hex');
+	try {
+		const decodedKey = multibase.decode(publicKey);
+    	const base64Key = Buffer.from(decodedKey).toString('base64');
 
-	// decrypt private key with derived key
-	const decrypted = await crypto.subtle.decrypt(
-		{
-			name: 'AES-GCM',
-			iv,
-		},
-		derivedKey,
-		encryptedKey
-	);
+		// derive key from passphrase
+		const derivedKey = await deriveSymmetricKeyFromSecret(base64Key, salt);
+		console.log('derivedKey', derivedKey);
+		// unwrap encrypted key with iv
+		const encryptedKey = Buffer.from(encryptedPrivateKeyHex, 'hex');
+		console.log('encryptedKey', encryptedKey);
+		const iv = Buffer.from(ivHex, 'hex');
+		console.log('iv', iv);
 
-	const secretKey = new Uint8Array(decrypted);
-
-	return secretKey;
+		// decrypt private key with derived key
+		const decrypted = await crypto.subtle.decrypt(
+			{
+				name: 'AES-GCM',
+				iv,
+			},
+			derivedKey,
+			encryptedKey
+		);
+		console.log('decrypted', decrypted);
+		const secretKey = new Uint8Array(decrypted);
+		console.log('secretKey', secretKey);	
+		return secretKey;
+	} catch (error) {
+		console.log('error', error);
+		throw error;
+	}
 }
 
 export function parseDidFromDidUrl(didUrl: string) {

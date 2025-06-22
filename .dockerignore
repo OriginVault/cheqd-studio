@@ -1,7 +1,6 @@
 # Skip unncecessary folders
 **/.git
 **/.github
-**/node_modules
 **/dist
 **/docker
 

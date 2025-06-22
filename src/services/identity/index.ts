@@ -69,6 +69,7 @@ export interface IIdentityService {
 	): Promise<KeyEntity>;
 	exportKey(kid: string, customer?: CustomerEntity): Promise<IKey>;
 	getKey(kid: string, customer?: CustomerEntity): Promise<ManagedKeyInfo | null>;
+	listKeys(customer?: CustomerEntity): Promise<KeyEntity[]>;
 	createDid(network: string, didDocument: DIDDocument, customer: CustomerEntity): Promise<IIdentifier>;
 	updateDid(didDocument: DIDDocument, customer: CustomerEntity, publicKeyHexs?: string[]): Promise<IIdentifier>;
 	deactivateDid(did: string, customer: CustomerEntity, publicKeyHexs?: string[]): Promise<boolean>;

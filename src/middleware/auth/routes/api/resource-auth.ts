@@ -9,3 +9,4 @@ export class ResourceAuthRuleProvider extends AuthRuleProvider {
 		this.registerRule('/resource/search/(.*)', 'GET', '', { allowUnauthorized: true, skipNamespace: true });
 	}
 }
+

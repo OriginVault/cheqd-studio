@@ -20,6 +20,7 @@ import { OperationCategoryNameEnum, OperationNameEnum } from '../../types/consta
 import { validate } from '../validator/decorator.js';
 import { SupportedKeyTypes } from '@veramo/utils';
 import crypto from 'crypto';
+import { deriveSymmetricKeyFromSecret } from '../../helpers/helpers.js';
 
 // ToDo: Make the format of /key/create and /key/read the same
 // ToDo: Add valdiation for /key/import
@@ -192,28 +193,47 @@ export class KeyController {
 	 */
 	@validate
 	public async importKey(request: Request, response: Response) {
-		// Get parameters requeired for key importing
-		const { type, encrypted = false, ivHex, salt, alias, privateKeyHex } = request.body as ImportKeyRequestBody;
-		// Get strategy e.g. postgres or local
+		const { type, encrypted = false, ivHex, salt, alias, privateKeyHex, encryptionMethod = 'aes-256-cbc' } = request.body as ImportKeyRequestBody;
 		const identityServiceStrategySetup = new IdentityServiceStrategySetup(response.locals.customer.customerId);
 		let decryptedPrivateKeyHex = privateKeyHex;
 
 		try {
 			if (encrypted) {
 				if (ivHex && salt) {
-					decryptedPrivateKeyHex = toString(await decryptPrivateKey(privateKeyHex, ivHex, salt), 'hex');
+					if (encryptionMethod === 'aes-gcm') {
+						// New AES-GCM method
+						const key = await deriveSymmetricKeyFromSecret(privateKeyHex, salt);
+						const iv = Buffer.from(ivHex, 'hex');
+						const encryptedBuffer = Buffer.from(privateKeyHex, 'hex');
+
+						const decrypted = await crypto.subtle.decrypt(
+							{
+								name: 'AES-GCM',
+								iv
+							},
+							key,
+							encryptedBuffer
+						);
+
+						decryptedPrivateKeyHex = Buffer.from(decrypted).toString('utf8');
+					} else {
+						// Legacy AES-CBC method
+						decryptedPrivateKeyHex = toString(await decryptPrivateKey(privateKeyHex, ivHex, salt), 'hex');
+					}
 				} else {
 					return response.status(StatusCodes.BAD_REQUEST).json({
 						error: `Invalid request: Property ivHex, salt is required when encrypted is set to true`,
 					} satisfies UnsuccessfulImportKeyResponseBody);
 				}
 			}
+
 			const key = await identityServiceStrategySetup.agent.importKey(
 				type || 'Ed25519',
 				decryptedPrivateKeyHex,
 				response.locals.customer,
 				alias
 			);
+
 			// Track the operation
 			eventTracker.emit('track', {
 				name: OperationNameEnum.KEY_IMPORT,
@@ -347,7 +367,7 @@ export class KeyController {
 	 */
 	@validate
 	public async exportKey(request: Request, response: Response) {
-		const { kid, includePrivateKey = false, encrypt = false, password } = request.body;
+		const { kid, includePrivateKey = false, encrypt = false, password, encryptionMethod = 'aes-256-cbc' } = request.body;
 		
 		// Get strategy e.g. postgres or local
 		const identityServiceStrategySetup = new IdentityServiceStrategySetup(response.locals.customer.customerId);
@@ -377,10 +397,10 @@ export class KeyController {
 					kid, 
 					response.locals.customer
 				);
-				
+				console.log('privateKeyData', privateKeyData);
 				if (!privateKeyData || !privateKeyData.privateKeyHex) {
 					return response.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-						error: 'Failed to retrieve private key data',
+						error: `Failed to retrieve private key data: ${JSON.stringify(privateKeyData)}`,
 					});
 				}
 				
@@ -392,24 +412,43 @@ export class KeyController {
 						});
 					}
 
-					// Use the password to derive a key for encryption
 					const salt = crypto.randomBytes(16).toString('hex');
 					const ivHex = crypto.randomBytes(16).toString('hex');
-					const keyBuffer = crypto.scryptSync(password, salt, 32);
+					
+					if (encryptionMethod === 'aes-gcm') {
+						// New AES-GCM method
+						const key = await deriveSymmetricKeyFromSecret(password, salt);
+						const iv = Buffer.from(ivHex, 'hex');
+						const messageBuffer = Buffer.from(privateKeyData.privateKeyHex, 'utf8');
+						
+						const encrypted = await crypto.subtle.encrypt(
+							{
+								name: 'AES-GCM',
+								iv
+							},
+							key,
+							messageBuffer
+						);
 
-					// Encrypt the private key using the derived key
-					const cipher = crypto.createCipheriv(
-						'aes-256-cbc' as any, 
-						keyBuffer as any, 
-						Buffer.from(ivHex, 'hex') as any
-					);
-					let encryptedPrivateKeyHex = cipher.update(privateKeyData.privateKeyHex, 'hex', 'hex');
-					encryptedPrivateKeyHex += cipher.final('hex');
+						exportData.privateKeyHex = Buffer.from(encrypted).toString('hex');
+					} else {
+						// Legacy AES-CBC method
+						const keyBuffer = crypto.scryptSync(password, salt, 32);
+						const cipher = crypto.createCipheriv(
+							'aes-256-cbc',
+							keyBuffer as crypto.BinaryLike,
+							Buffer.from(ivHex, 'hex') as crypto.BinaryLike
+						);
+						let encryptedPrivateKeyHex = cipher.update(privateKeyData.privateKeyHex, 'hex', 'hex');
+						encryptedPrivateKeyHex += cipher.final('hex');
+						
+						exportData.privateKeyHex = encryptedPrivateKeyHex;
+					}
 
-					exportData.privateKeyHex = encryptedPrivateKeyHex;
 					exportData.encrypted = true;
 					exportData.ivHex = ivHex;
 					exportData.salt = salt;
+					exportData.encryptionMethod = encryptionMethod;
 				} else {
 					exportData.privateKeyHex = privateKeyData.privateKeyHex;
 					exportData.encrypted = false;

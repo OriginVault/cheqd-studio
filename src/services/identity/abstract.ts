@@ -69,6 +69,10 @@ export abstract class AbstractIdentityService implements IIdentityService {
 		throw new Error(`Not supported`);
 	}
 
+	listKeys(customer?: CustomerEntity): Promise<KeyEntity[]> {
+		throw new Error(`Not supported`);
+	}
+
 	createDid(network: string, didDocument: DIDDocument, customer: CustomerEntity): Promise<IIdentifier> {
 		throw new Error(`Not supported`);
 	}

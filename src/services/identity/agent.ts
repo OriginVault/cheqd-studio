@@ -78,11 +78,10 @@ import { jwtDecode } from 'jwt-decode';
 import type { ICheqdCreateLinkedResourceArgs } from '@cheqd/did-provider-cheqd';
 import type { TPublicKeyEd25519 } from '@cheqd/did-provider-cheqd';
 import { SupportedKeyTypes } from '@veramo/utils';
+import { KeyService } from '../api/key.js';
+import { CustomerEntity } from '../../database/entities/customer.entity.js';
 
 // dynamic import to avoid circular dependency
-const VeridaResolver =
-	process.env.ENABLE_VERIDA_CONNECTOR === 'true' ? (await import('@verida/vda-did-resolver')).getResolver : undefined;
-
 export class Veramo {
 	static instance = new Veramo();
 
@@ -130,15 +129,7 @@ export class Veramo {
 				...KeyDidResolver(),
 				...UniversalResolver(),
 			};
-
-			// handle optional dependencies
-			if (VeridaResolver) {
-				const veridaResolver = VeridaResolver();
-
-				// add verida resolver to resolver map
-				Object.assign(resolvers, veridaResolver);
-			}
-
+			
 			plugins.push(
 				new DIDResolverPlugin({
 					resolver: new Resolver(resolvers),
@@ -162,11 +153,12 @@ export class Veramo {
 		return createAgent({ plugins });
 	}
 
-	async createKey(agent: TAgent<IKeyManager>, type: SupportedKeyTypes = SupportedKeyTypes.Ed25519) {
+	async createKey(agent: TAgent<IKeyManager>, type: SupportedKeyTypes = SupportedKeyTypes.Ed25519, alias?: string) {
 		const [kms] = await agent.keyManagerGetKeyManagementSystems();
 		return await agent.keyManagerCreate({
 			type: type || 'Ed25519',
 			kms,
+			meta: alias ? { alias } : undefined
 		});
 	}
 
@@ -188,7 +180,7 @@ export class Veramo {
 	}
 
 	async exportKey(agent: TAgent<IKeyManager>, kid: string) {
-		return await agent.keyManagerExport({ kid });
+		return await agent.keyManagerGet({ kid });
 	}
 
 	async createDid(agent: TAgent<IDIDManager>, network: string, didDocument: DIDDocument): Promise<IIdentifier> {
@@ -252,6 +244,12 @@ export class Veramo {
 
 	async listDids(agent: TAgent<IDIDManager>) {
 		return (await agent.didManagerFind()).map((res) => res.did);
+	}
+
+	async listKeys(customer: CustomerEntity) {
+		const keys = await KeyService.instance.listKeys(customer);
+
+		return keys;
 	}
 
 	async resolveDid(agent: TAgent<IResolver>, did: string) {

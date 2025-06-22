@@ -1,0 +1,51 @@
+{
+  "@context": "https://w3id.org/did-resolution/v1",
+  "didDocument": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://identity.foundation/.well-known/did-configuration/v1",
+      "https://w3id.org/security/suites/jws-2020/v1"
+    ],
+    "id": "did:cheqd:mainnet:53c6369f-e004-4fb9-8d89-dd31f8db566a",
+    "controller": [
+      "did:cheqd:mainnet:53c6369f-e004-4fb9-8d89-dd31f8db566a"
+    ],
+    "verificationMethod": [
+      {
+        "id": "did:cheqd:mainnet:53c6369f-e004-4fb9-8d89-dd31f8db566a#key-1",
+        "type": "JsonWebKey2020",
+        "controller": "did:cheqd:mainnet:53c6369f-e004-4fb9-8d89-dd31f8db566a",
+        "publicKeyJwk": {
+          "crv": "Ed25519",
+          "kty": "OKP",
+          "x": "9EAa5qFhWvxKpfFxJ_oESulhT3z-fULbs36WBR-1p78"
+        }
+      }
+    ],
+    "authentication": [
+      "did:cheqd:mainnet:53c6369f-e004-4fb9-8d89-dd31f8db566a#key-1"
+    ],
+    "service": [
+      {
+        "id": "did:cheqd:mainnet:53c6369f-e004-4fb9-8d89-dd31f8db566a#linked-domain-1",
+        "type": "LinkedDomains",
+        "serviceEndpoint": [
+          "https://studio.originvault.box/.well-known/did-configuration.json"
+        ]
+      }
+    ]
+  },
+  "didResolutionMetadata": {
+    "contentType": "application/did",
+    "retrieved": "2025-05-30T16:07:58Z",
+    "did": {
+      "didString": "did:cheqd:mainnet:53c6369f-e004-4fb9-8d89-dd31f8db566a",
+      "methodSpecificId": "53c6369f-e004-4fb9-8d89-dd31f8db566a",
+      "method": "cheqd"
+    }
+  },
+  "didDocumentMetadata": {
+    "created": "2025-05-30T16:05:20Z",
+    "versionId": "3415fed2-55c0-4342-9b81-946f70bfe4ac"
+  }
+}

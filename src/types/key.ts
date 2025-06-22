@@ -7,11 +7,12 @@ import type { SupportedKeyTypes } from '@veramo/utils';
 
 export interface KeyImport {
 	privateKeyHex: string;
-	encrypted: boolean;
-	ivHex: string | undefined;
-	salt: string | undefined;
+	encrypted?: boolean;
+	ivHex?: string;
+	salt?: string;
 	alias?: string;
 	type: SupportedKeyTypes.Ed25519 | SupportedKeyTypes.Secp256k1;
+	encryptionMethod?: 'aes-256-cbc' | 'aes-gcm';
 }
 
 // Requests

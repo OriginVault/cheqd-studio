@@ -41,6 +41,7 @@ RUN apk update && \
 COPY --from=builder --chown=node:node /home/node/app/*.json /home/node/app/*.md ./
 COPY --from=builder --chown=node:node /home/node/app/dist ./dist
 COPY --from=builder --chown=node:node /home/node/app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /home/node/app/public ./public
 
 # Base arguments: build-time
 ARG NPM_CONFIG_LOGLEVEL=warn

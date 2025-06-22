@@ -3794,6 +3794,45 @@
         }
       }
     },
+    "/did/add-key": {
+      "post": {
+        "tags": [
+          "DID"
+        ],
+        "summary": "Add a new Verification Method to a DID Document.",
+        "description": "Add a new Verification Method to a DID Document.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddKeyToDidRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request was successful.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DidResolution"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/schemas/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/schemas/UnauthorizedError"
+          },
+          "500": {
+            "$ref": "#/components/schemas/InternalError"
+          }
+        }
+      }
+    },
     "/key/create": {
       "post": {
         "tags": [

@@ -1,9 +1,9 @@
 import { BeforeInsert, BeforeUpdate, Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-
-import * as dotenv from 'dotenv';
 import { Key } from '@veramo/data-store';
 import { CustomerEntity } from './customer.entity.js';
-import type { TKeyType } from '@veramo/core';
+import type { TKeyType } from '@veramo/core-types';
+import dotenv from 'dotenv';
+
 dotenv.config();
 
 @Entity('key')
@@ -29,11 +29,17 @@ export class KeyEntity extends Key {
 	@BeforeInsert()
 	setCreatedAt() {
 		this.createdAt = new Date();
+		if (this.publicKeyAlias) {
+			this.meta = { ...this.meta, alias: this.publicKeyAlias };
+		}
 	}
 
 	@BeforeUpdate()
 	setUpdateAt() {
 		this.updatedAt = new Date();
+		if (this.publicKeyAlias) {
+			this.meta = { ...this.meta, alias: this.publicKeyAlias };
+		}
 	}
 
 	@ManyToOne(() => CustomerEntity, (customer) => customer.customerId, { onDelete: 'CASCADE' })
@@ -46,5 +52,7 @@ export class KeyEntity extends Key {
 		this.type = type;
 		this.publicKeyHex = publicKeyHex;
 		this.publicKeyAlias = '';
+		this.meta = {};
+		this.kms = 'local';
 	}
 }

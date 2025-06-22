@@ -37,6 +37,7 @@ export type UpdateDidRequestBody = {
 	verificationMethod: VerificationMethod[];
 	authentication: string[];
 	didDocument?: DIDDocument;
+	controller?: string | string[];
 } & { publicKeyHexs?: string[] };
 
 export type ImportDidRequestBody = DidImportRequest;

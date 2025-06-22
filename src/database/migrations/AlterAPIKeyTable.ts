@@ -4,8 +4,18 @@ import { SecretBox } from '@veramo/kms-local';
 
 export class AlterAPIKeyTable1695740346004 implements MigrationInterface {
 	public async up(queryRunner: QueryRunner): Promise<void> {
-		const table_name = 'apiKey';
+		// Validate encryption key before initializing SecretBox
+		if (!process.env.EXTERNAL_DB_ENCRYPTION_KEY) {
+			throw new Error('EXTERNAL_DB_ENCRYPTION_KEY environment variable is required but not set');
+		}
+		
+		if (process.env.EXTERNAL_DB_ENCRYPTION_KEY.length < 32) {
+			throw new Error('EXTERNAL_DB_ENCRYPTION_KEY must be at least 32 characters long');
+		}
+		
 		const secretBox = new SecretBox(process.env.EXTERNAL_DB_ENCRYPTION_KEY);
+
+		const table_name = 'apiKey';
 
 		await queryRunner.addColumn(
 			table_name,

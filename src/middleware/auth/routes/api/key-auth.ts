@@ -5,7 +5,10 @@ export class KeyAuthProvider extends AuthRuleProvider {
 		super();
 		this.registerRule('/key/create', 'POST', 'create:key', { skipNamespace: true });
 		this.registerRule('/key/import', 'POST', 'import:key', { skipNamespace: true });
+		this.registerRule('/key/export', 'POST', 'export:key', { skipNamespace: true });
 		this.registerRule('/key/read/(.*)', 'GET', 'read:key', { skipNamespace: true });
 		this.registerRule('/key/list', 'GET', 'list:key', { skipNamespace: true });
 	}
 }
+
+

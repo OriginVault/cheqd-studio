@@ -50,7 +50,8 @@
 		"example.env",
 		"LICENSE",
 		"package.json",
-		"README.md"
+		"README.md",
+		"favicon.ico"
 	],
 	"dependencies": {
 		"@cheqd/did-provider-cheqd": "^4.5.3",
@@ -59,6 +60,7 @@
 		"@cosmjs/amino": "^0.33.1",
 		"@cosmjs/encoding": "^0.33.1",
 		"@logto/express": "^2.3.17",
+		"@originvault/ov-id-sdk": "^0.0.18-alpha.0",
 		"@stablelib/ed25519": "^1.0.3",
 		"@veramo/core": "^6.0.0",
 		"@veramo/credential-ld": "^6.0.0",
@@ -80,7 +82,6 @@
 		"cookie-parser": "^1.4.7",
 		"copyfiles": "^2.4.1",
 		"cors": "^2.8.5",
-		"cross-env": "^7.0.3",
 		"did-resolver": "^4.1.0",
 		"dotenv": "^16.5.0",
 		"express": "^4.21.2",
@@ -105,7 +106,8 @@
 		"swagger-ui-express": "^5.0.1",
 		"typeorm": "^0.3.22",
 		"uint8arrays": "^5.1.0",
-		"uri-js": "^4.4.1"
+		"uri-js": "^4.4.1",
+		"validator": "^13.15.15"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.52.0",
@@ -136,6 +138,7 @@
 		"@typescript-eslint/parser": "^8.31.1",
 		"buffer": "6.0.3",
 		"conventional-changelog-conventionalcommits": "^8.0.0",
+		"cross-env": "^7.0.3",
 		"eslint": "^9.25.1",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-config-typescript": "^3.0.0",

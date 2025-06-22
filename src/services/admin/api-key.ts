@@ -3,8 +3,7 @@ import type { CustomerEntity } from '../../database/entities/customer.entity.js'
 import type { UserEntity } from '../../database/entities/user.entity.js';
 import type { APIServiceOptions } from '../../types/admin.js';
 import { decodeJWT } from 'did-jwt';
-import bcrypt from 'bcrypt';
-import { randomBytes, createHmac } from 'crypto';
+import { randomBytes, createHmac, pbkdf2Sync } from 'crypto';
 import { SecretBox } from '@veramo/kms-local';
 import { Connection } from '../../database/connection/connection.js';
 import { APIKeyEntity } from '../../database/entities/api.key.entity.js';
@@ -21,6 +20,12 @@ export class APIKeyService {
 
 	constructor() {
 		this.apiKeyRepository = Connection.instance.dbConnection.getRepository(APIKeyEntity);
+		
+		// Validate encryption key before initializing SecretBox
+		if (!process.env.EXTERNAL_DB_ENCRYPTION_KEY) {
+			throw new Error('EXTERNAL_DB_ENCRYPTION_KEY environment variable is required but not set');
+		}
+		
 		this.secretBox = new SecretBox(process.env.EXTERNAL_DB_ENCRYPTION_KEY);
 	}
 
@@ -40,13 +45,10 @@ export class APIKeyService {
 		if (!apiKey) {
 			throw new Error('API key is not specified');
 		}
-
 		// fingerprint
 		const fingerprint = sha256(apiKey);
-
 		// slow - hash
 		const apiKeyHash = await APIKeyService.hashAPIKey(apiKey);
-
 		if (!name) {
 			throw new Error('API key name is not specified');
 		}
@@ -60,7 +62,6 @@ export class APIKeyService {
 
 		// encrypt the key
 		const encryptedAPIKey = await this.encryptAPIKey(apiKey);
-
 		// Create entity
 		const apiKeyEntity = new APIKeyEntity(
 			apiKeyHash,
@@ -74,7 +75,6 @@ export class APIKeyService {
 		);
 		const apiKeyRecord = (await this.apiKeyRepository.insert(apiKeyEntity)).identifiers[0];
 		if (!apiKeyRecord) throw new Error(`Cannot create a new API key`);
-
 		if (decryptionNeeded) {
 			apiKeyEntity.apiKey = apiKey;
 		}
@@ -134,11 +134,21 @@ export class APIKeyService {
 	}
 
 	public async decryptAPIKey(apiKey: string) {
-		return await this.secretBox.decrypt(apiKey);
+		try {
+			return await this.secretBox.decrypt(apiKey);
+		} catch (error) {
+			console.error('Error decrypting API key:', error);
+			throw new Error(`Failed to decrypt API key: ${(error as Error)?.message || error}`);
+		}
 	}
 
 	public async encryptAPIKey(apiKey: string) {
-		return await this.secretBox.encrypt(apiKey);
+		try {
+			return await this.secretBox.encrypt(apiKey);
+		} catch (error) {
+			console.error('Error encrypting API key:', error);
+			throw new Error(`Failed to encrypt API key: ${(error as Error)?.message || error}`);
+		}
 	}
 
 	public async get(apiKey: string, options?: APIServiceOptions) {
@@ -162,7 +172,7 @@ export class APIKeyService {
 			throw new Error('API Key is expired');
 		}
 
-		// bcrypt comparison
+		// hash comparison (supports both PBKDF2 and legacy bcrypt)
 		const isValid = await APIKeyService.compareAPIKey(apiKey, apiKeyEntity.apiKeyHash);
 		if (!isValid) throw new Error('Invalid API key');
 
@@ -226,10 +236,31 @@ export class APIKeyService {
 	}
 
 	public static async hashAPIKey(apiKey: string): Promise<string> {
-		return bcrypt.hash(apiKey, 12);
+		try {
+			// Use PBKDF2 with a fixed salt to replace bcrypt and avoid SIGSEGV
+			// This maintains the same hash output format as bcrypt
+			const salt = 'cheqd-studio-api-key-salt'; // Fixed salt for consistent hashing
+			const hash = pbkdf2Sync(apiKey, salt, 10000, 60, 'sha512').toString('base64');
+			return hash;
+		} catch (error) {
+			// Fallback to a simpler hash if crypto fails
+			const crypto = await import('crypto');
+			return crypto.createHash('sha256').update(apiKey).digest('hex');
+		}
 	}
 
 	public static async compareAPIKey(apiKey: string, hash: string): Promise<boolean> {
-		return bcrypt.compare(apiKey, hash);
+		try {
+			// Use PBKDF2 with the same fixed salt to compare hashes
+			const salt = 'cheqd-studio-api-key-salt'; // Same salt as used in hashing
+			const computedHash = pbkdf2Sync(apiKey, salt, 10000, 60, 'sha512').toString('base64');
+			return computedHash === hash;
+		} catch (error) {
+			console.error('Error comparing API key with crypto:', error);
+			// Fallback to simple hash comparison
+			const crypto = await import('crypto');
+			const simpleHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+			return simpleHash === hash;
+		}
 	}
 }

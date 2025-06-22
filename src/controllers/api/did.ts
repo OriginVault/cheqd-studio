@@ -5,8 +5,10 @@ import {
 	DIDDocument,
 	MethodSpecificIdAlgo,
 	Service,
+	VerificationMethod,
 	VerificationMethods,
 	createDidVerificationMethod,
+	createVerificationKeys,
 } from '@cheqd/sdk';
 import { StatusCodes } from 'http-status-codes';
 import { IdentityServiceStrategySetup } from '../../services/identity/index.js';
@@ -44,6 +46,7 @@ import { arePublicKeyHexsInWallet } from '../../services/helpers.js';
 import { CheqdProviderErrorCodes } from '@cheqd/did-provider-cheqd';
 import type { CheqdProviderError } from '@cheqd/did-provider-cheqd';
 import { validate } from '../validator/decorator.js';
+import { KeyEntity } from '../../database/entities/key.entity.js';
 
 export class DIDController {
 	public static createDIDValidator = [
@@ -154,6 +157,31 @@ export class DIDController {
 			.withMessage(
 				'KeyImportRequest object is invalid, privateKeyHex is required, Property ivHex, salt is required when encrypted is set to true, property type should be Ed25519 or Secp256k1'
 			)
+			.bail(),
+	];
+
+	public static addKeyToDIDValidator = [
+		check('did').exists().isDID().bail(),
+		check('keyId')
+			.optional()
+			.isHexadecimal()
+			.withMessage('keyId should be a hexadecimal string')
+			.bail(),
+		check('type')
+			.optional()
+			.isString()
+			.isIn([SupportedKeyTypes.Ed25519, SupportedKeyTypes.Secp256k1])
+			.withMessage('Invalid key type')
+			.bail(),
+		check()
+			.custom((_, { req }) => req.body.keyId || req.body.type)
+			.withMessage('Either keyId or type must be provided')
+			.bail(),
+		check('verificationMethodType')
+			.exists()
+			.isString()
+			.isIn([VerificationMethods.Ed255192020, VerificationMethods.Ed255192018, VerificationMethods.JWK])
+			.withMessage('Unsupported verificationMethod type')
 			.bail(),
 	];
 
@@ -353,6 +381,7 @@ export class DIDController {
 	@validate
 	public async updateDid(request: Request, response: Response) {
 		// handle request params
+		console.log('Update DID request body:', request.body);
 		const { did, service, verificationMethod, authentication, publicKeyHexs } =
 			request.body as UpdateDidRequestBody;
 		// Get the didDocument from the request if it's placed there
@@ -787,6 +816,119 @@ export class DIDController {
 			return response.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
 				error: `Internal error: ${(error as Error)?.message || error}`,
 			} satisfies UnsuccessfulResolveDidResponseBody);
+		}
+	}
+
+	/**
+	 * @openapi
+	 *
+	 * /did/add-key:
+	 *   post:
+	 *     tags: [ DID ]
+	 *     summary: Add a new Verification Method to a DID Document.
+	 *     description: Add a new Verification Method to a DID Document.
+	 *     requestBody:
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             $ref: '#/components/schemas/AddKeyToDidRequest'
+	 *     responses:
+	 *       200:
+	 *         description: The request was successful.
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/DidResolution'
+	 *       400:
+	 *         $ref: '#/components/schemas/InvalidRequest'
+	 *       401:
+	 *         $ref: '#/components/schemas/UnauthorizedError'
+	 *       500:
+	 *         $ref: '#/components/schemas/InternalError'
+	 */
+	@validate
+	public async addKeyToDid(request: Request, response: Response) {
+		const { did, keyId, verificationMethodType, type } = request.body;
+		const identityServiceStrategySetup = new IdentityServiceStrategySetup(response.locals.customer.customerId);
+
+		try {
+
+			const didDocument = await identityServiceStrategySetup.agent.getDid(did, response.locals.customer);
+			const resolvedDocument = await identityServiceStrategySetup.agent.resolveDid(did);
+			// Get or create key
+			let key;
+			if (keyId) {
+				key = await identityServiceStrategySetup.agent.getKey(keyId, response.locals.customer);
+				if (!key) {
+					return response.status(StatusCodes.BAD_REQUEST).json({
+						error: `Key with id ${keyId} not found`,
+					});
+				}
+			} else {
+				const keyType = type || SupportedKeyTypes.Ed25519;
+				
+				// First try to find an unused key of the specified type
+				const unusedKeys = await identityServiceStrategySetup.agent.listKeys();
+				key = unusedKeys.find((k: KeyEntity) => k.type === keyType && !k.meta?.did && did === k.meta?.did);
+				if (!key) {
+					key = await identityServiceStrategySetup.agent.createKey(
+						keyType,
+						response.locals.customer,
+						`${did}#key-${didDocument.keys.length + 1}`
+					);
+				}
+			}
+
+			// Get the existing D
+			if (!didDocument) {
+				return response.status(StatusCodes.NOT_FOUND).json({
+					error: `DID document not found for ${did}`,
+				});
+			}
+
+			// Create verification method from the key
+			const newVerificationMethod = createDidVerificationMethod(
+				[verificationMethodType || VerificationMethods.Ed255192020],
+				[createVerificationKeys(
+					key.publicKeyHex,
+					MethodSpecificIdAlgo.Uuid,
+					`key-${didDocument.keys.length + 1}`,
+					'mainnet' as CheqdNetwork,
+					undefined,
+					did
+				)]
+			)[0];
+
+			// Create updated document with new verification method
+			const updatedDocument = {
+				...didDocument,
+				id: did,
+				keys: [...(didDocument.keys || []), key],
+				controller: resolvedDocument.didDocument?.controller,
+				verificationMethod: [...(resolvedDocument.didDocument?.verificationMethod || []), newVerificationMethod],
+				authentication: resolvedDocument.didDocument?.authentication,
+			};
+			// Get all public key hexes from the verification methods
+			const existingPublicKeyHexs = updatedDocument.verificationMethod
+				.map((vm: VerificationMethod) => {
+					const result = extractPublicKeyHex(vm);
+					return result.publicKeyHex;
+				})
+				.filter(Boolean);
+
+			// Update DID document with all keys
+			const result = await identityServiceStrategySetup.agent.updateDid(
+				updatedDocument,
+				response.locals.customer,
+				existingPublicKeyHexs
+			);
+
+			return response.json(result);
+		} catch (error) {
+			console.error('Error updating DID document:', error);
+			return response.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+				error: 'Failed to update DID document'
+			});
 		}
 	}
 }

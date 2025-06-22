@@ -25,11 +25,12 @@ export class LogToWebHook {
 
 	static getCustomerId(request: Request): string {
 		const { body } = request;
-		return body.user.id;
+		return body.data.id;
 	}
 
 	static isUserSuspended(request: Request): boolean {
 		const { body } = request;
-		return body.user.isSuspended;
+		console.log('isUserSuspended', body);
+		return body.data.isSuspended;
 	}
 }

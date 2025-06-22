@@ -151,7 +151,14 @@ export class APIKeyController {
 				expiresAt: apiKeyEntity.expiresAt.toISOString(),
 				revoked: apiKeyEntity.revoked,
 			} satisfies APIKeyCreateResponseBody);
-		} catch (error) {
+		} catch (error) {			
+			// Check for specific encryption key errors
+			if (error instanceof Error && error.message.includes('EXTERNAL_DB_ENCRYPTION_KEY')) {
+				return response.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+					error: 'Server configuration error: Encryption key not properly configured',
+				} satisfies APIKeyCreateUnsuccessfulResponseBody);
+			}
+			
 			return response.status(500).json({
 				error: `Internal error: ${(error as Error)?.message || error}`,
 			} satisfies APIKeyCreateUnsuccessfulResponseBody);

@@ -16,7 +16,7 @@ export class APIGuard {
 	private userInfoFetcher: IUserInfoFetcher;
 	private oauthProvider: IOAuthProvider;
 	private static bearerTokenIdentifier = 'Bearer';
-	private pathSkip = ['/swagger', '/admin/swagger', '/static', '/logto', '/account/bootstrap', '/admin/webhook'];
+	private pathSkip = ['/swagger', '/admin/swagger', '/health', '/whoami', '/robots.txt', '/./favicon-32x32.png', '/./favicon-16x16.png', '/favicon.ico', '/static', '/logto', '/account/bootstrap', '/admin/webhook'];
 
 	constructor(authRuleRepository: AuthRuleRepository, oauthProvider: IOAuthProvider) {
 		this.authRuleRepository = authRuleRepository;
@@ -53,7 +53,6 @@ export class APIGuard {
 		if (resp) {
 			return resp;
 		}
-
 		// Checks if the list of scopes from user enough to make an action
 		if (!authRule.isAllowedUnauthorized() && !authRule.areValidScopes(response.locals.scopes)) {
 			return response.status(StatusCodes.FORBIDDEN).send({
@@ -82,7 +81,7 @@ export class APIGuard {
 		}
 
 		if (m2mCreds) {
-			this.setUserInfoStrategy(new M2MCredsTokenUserInfoFetcher(m2mCreds, this.oauthProvider));
+			this.setUserInfoStrategy(new M2MCredsTokenUserInfoFetcher(bearerToken, this.oauthProvider));
 			return;
 		}
 

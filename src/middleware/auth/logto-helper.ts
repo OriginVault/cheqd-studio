@@ -398,6 +398,7 @@ export class LogToHelper extends OAuthProvider implements IOAuthProvider {
 
 	private async getUserInfo(userId: string): Promise<ICommonErrorResponse> {
 		const uri = new URL(`/api/users/${userId}`, process.env.LOGTO_ENDPOINT);
+		console.log('uri', uri);
 		try {
 			return await this.getToLogto(uri, 'GET');
 		} catch (err) {
@@ -480,7 +481,7 @@ export class LogToHelper extends OAuthProvider implements IOAuthProvider {
 			},
 			method: 'GET',
 		});
-
+		console.log('response', response);
 		if (!response.ok) {
 			return this.returnError(StatusCodes.BAD_GATEWAY, await response.json());
 		}

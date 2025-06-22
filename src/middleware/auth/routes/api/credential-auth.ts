@@ -15,3 +15,4 @@ export class CredentialAuthRuleProvider extends AuthRuleProvider {
 		this.registerRule('/credential/verify', 'POST', '', { allowUnauthorized: true, skipNamespace: true });
 	}
 }
+

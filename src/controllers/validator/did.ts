@@ -46,6 +46,7 @@ export class CheqdDIDValidator extends BaseDidValidator implements IValidator {
 			return _v;
 		}
 		did = did as string;
+		console.log('validate did', did);
 		// Check if DID is cheqd
 		const method = did.split(':')[1];
 		if (method != this.subject) {
@@ -70,7 +71,8 @@ export class CheqdDIDValidator extends BaseDidValidator implements IValidator {
 			};
 		}
 		// Check identifier
-		const id = did.split(':')[3];
+		const id = did.includes('#') ? did.split(':')[3]?.split('#')[0] : did.split(':')[3];
+		console.log('did', did, 'id', id);
 		if (!id) {
 			return {
 				valid: false,
@@ -194,7 +196,7 @@ export class VeridaDIDValidator extends BaseDidValidator implements IValidator {
 		}
 
 		// Check identifier
-		const identifier = did.split(':')[3];
+		const identifier = did.split(':')[3]?.split('#')[0];
 		if (!identifier) {
 			return {
 				valid: false,

@@ -372,8 +372,11 @@ export class WebhookController {
 			throw new Error(message);
 		}
 
-		const user = await UserService.instance.userRepository.findOne({ where: { customer: { customerId } } });
-
+		const user = await UserService.instance.userRepository.findOne({
+			where: { customer: { customerId } },
+			order: { createdAt: 'DESC' }
+		});
+		console.log('user', JSON.stringify(user));
 		if (user) {
 			switch (operation) {
 				case OperationNameEnum.SUBSCRIPTION_CREATE:

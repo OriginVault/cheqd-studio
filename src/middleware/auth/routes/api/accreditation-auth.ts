@@ -53,3 +53,4 @@ export class AccreditationAuthRuleProvider extends AuthRuleProvider {
 		);
 	}
 }
+

@@ -183,13 +183,14 @@ export class AccountController {
 
 		// Status Tracker
 		const status = BootStrapAccountResponse.initialize();
-
+		console.log('status', status);
 		// 1. Get logTo UserId from request body
 		if (!request.body.data || !request.body.data.id || !request.body.data.primaryEmail) {
 			return response.status(StatusCodes.BAD_REQUEST).json({
 				error: 'User id is not specified or primaryEmail is not set',
 			} satisfies UnsuccessfulResponseBody);
 		}
+		console.log('request.body', request.body);
 		const logToUserId = request.body.data.id;
 		const logToUserEmail = request.body.data.primaryEmail;
 		// use email as name, because "name" is unique in the current db setup.
@@ -204,7 +205,7 @@ export class AccountController {
 			CustomerService.instance.find({ email: logToUserEmail }),
 			logToHelper.setup(),
 		]);
-
+		console.log('userEntity', userEntity);
 		if (logtoHelperSetup.status !== StatusCodes.OK) {
 			return response.status(StatusCodes.SERVICE_UNAVAILABLE).json({
 				error: logtoHelperSetup.error,
@@ -241,7 +242,7 @@ export class AccountController {
 						severity: 'info',
 					});
 				}
-
+				console.log('customerEntity', customerEntity);
 				// 3 Assign role to user
 				let role: RoleEntity | null = null;
 				const logtoRoleSync = await syncLogtoUserRoles(
@@ -251,6 +252,7 @@ export class AccountController {
 					logToUserId,
 					customerEntity
 				);
+				console.log('logtoRoleSync', logtoRoleSync);
 				if (!logtoRoleSync.success) {
 					role = await RoleService.instance.getDefaultRole();
 				} else {
@@ -278,7 +280,7 @@ export class AccountController {
 					severity: 'info',
 				});
 			}
-
+			console.log('userEntity', userEntity);
 			//4. Check if there is customer associated with such user
 			if (!userEntity.customer) {
 				customerEntity = (await CustomerService.instance.create(logToName, logToUserEmail)) as CustomerEntity;
@@ -287,6 +289,7 @@ export class AccountController {
 						error: 'User exists in database: Customer was not created',
 					} satisfies UnsuccessfulResponseBody);
 				}
+				console.log('customerEntity', customerEntity);
 				// Notify
 				await eventTracker.notify({
 					message: EventTracker.compileBasicNotification(
@@ -305,7 +308,7 @@ export class AccountController {
 
 			// Customer initializaiton is complete
 			status.customerInitialized = true;
-
+			console.log('status', status);
 			// 6. check Stripe account if still missing
 			if (process.env.STRIPE_ENABLED === 'true' && !customerEntity.paymentProviderId) {
 				// should we await? or fire off and forget?
@@ -361,9 +364,10 @@ export class AccountController {
 		accounts: PaymentAccountEntity[],
 		customerEntity: CustomerEntity
 	): Promise<SafeAPIResponse<PaymentAccountEntity>> {
-		const existingAccount = accounts.find((acc) => acc.namespace === network);
-		if (existingAccount) {
-			const key = await KeyService.instance.get(existingAccount.key.kid);
+		try {
+			const existingAccount = accounts.find((acc) => acc.namespace === network);
+			if (existingAccount) {
+				const key = await KeyService.instance.get(existingAccount.key.kid);
 			if (key) {
 				return {
 					success: true,
@@ -413,10 +417,18 @@ export class AccountController {
 		});
 
 		return {
-			success: true,
-			status: 200,
-			data: account,
-		};
+				success: true,
+				status: 200,
+				data: account,
+			};
+		} catch (err: any) {
+			console.error('Provision customer account error:', err);
+			return {
+				success: false,
+				status: 500,
+				error: `Provision customer account error: ${err.message}`,
+			};
+		}
 	}
 
 	/**
@@ -605,8 +617,21 @@ async function updateCustomData(
 ) {
 	try {
 		const existing = await logToHelper.getCustomData(logToId);
-		if (Object.keys(existing.data).length === 0 && mainnetResp.data?.address && testnetResp.data?.address) {
+		const existingKeys = Object.keys(existing.data);
+		const keysPresent = !existingKeys.some(key => key === 'customer') || !existingKeys.some(key => key === 'paymentAccount');
+		if (existingKeys.length === 0 && mainnetResp.data?.address && testnetResp.data?.address) {
 			const customData = {
+				customer: { id: customer.customerId, name: customer.name },
+				paymentAccount: {
+					mainnet: mainnetResp.data.address,
+					testnet: testnetResp.data.address,
+				},
+			};
+			const res = await logToHelper.updateCustomData(logToId, customData);
+			if (res.status === 200) status.customDataUpdated = true;
+		} else if((keysPresent && mainnetResp.data?.address && !testnetResp.data?.address)) {
+			const customData = {
+				...existing.data,
 				customer: { id: customer.customerId, name: customer.name },
 				paymentAccount: {
 					mainnet: mainnetResp.data.address,

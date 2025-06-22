@@ -171,7 +171,7 @@ export class PostgresIdentityService extends DefaultIdentityService {
 
 	async createKey(type: SupportedKeyTypes = SupportedKeyTypes.Ed25519, customer?: CustomerEntity, keyAlias?: string) {
 		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-		const key = await Veramo.instance.createKey(this.agent!, type);
+		const key = await Veramo.instance.createKey(this.agent!, type, keyAlias);
 		// Update our specific key columns
 		return await KeyService.instance.update(key.kid, customer, keyAlias, new Date());
 	}
@@ -186,6 +186,26 @@ export class PostgresIdentityService extends DefaultIdentityService {
 		const key = await Veramo.instance.importKey(this.agent!, type, privateKeyHex);
 		// Update our specific key columns
 		return await KeyService.instance.update(key.kid, customer, keyAlias, new Date());
+	}
+
+	async exportKey(kid: string): Promise<IKey> {
+		const key = await Veramo.instance.exportKey(this.agent!, kid);
+		const privateKey = (await this.getPrivateKey(kid))?.privateKeyHex;
+		if (!privateKey) {
+			throw new Error(`No private key found for kid ${kid}`);
+		}
+		return {
+			kid: key.kid,
+			type: key.type,
+			publicKeyHex: key.publicKeyHex,
+			meta: key.meta,
+			privateKeyHex: privateKey,
+			kms: 'postgres',
+		};
+	}
+
+	async listKeys(customer: CustomerEntity) {
+		return await KeyService.instance.listKeys(customer);
 	}
 
 	async getKey(kid: string, customer: CustomerEntity) {
@@ -254,10 +274,14 @@ export class PostgresIdentityService extends DefaultIdentityService {
 		}
 		try {
 			const agent = await this.createAgent(customer);
-			const publicKeys: TPublicKeyEd25519[] =
-				publicKeyHexs?.map((key) => {
-					return toTPublicKeyEd25519(key);
-				}) || [];
+			const validPublicKeyHexs = publicKeyHexs?.filter((key): key is string => {
+				return typeof key === 'string' && key.length > 0;
+			}) || [];
+			
+			const publicKeys: TPublicKeyEd25519[] = validPublicKeyHexs.map((key) => {
+				return toTPublicKeyEd25519(key);
+			});
+
 			const identifier: IIdentifier = await Veramo.instance.updateDid(agent, didDocument, publicKeys);
 			return identifier;
 		} catch (error) {

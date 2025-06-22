@@ -5,11 +5,9 @@ import { IdentityServiceStrategySetup } from '../identity/index.js';
 import { v4 } from 'uuid';
 import * as dotenv from 'dotenv';
 import type { CustomerEntity } from '../../database/entities/customer.entity.js';
-import { VeridaDIDValidator } from '../../controllers/validator/did.js';
 import { ResourceConnector } from '../connectors/resource.js';
 dotenv.config();
 
-const { ENABLE_VERIDA_CONNECTOR } = process.env;
 
 export class Credentials {
 	public static instance = new Credentials();
@@ -54,29 +52,8 @@ export class Credentials {
 		const verifiable_credential = await new IdentityServiceStrategySetup(
 			customer.customerId
 		).agent.createCredential(credential, format, statusOptions, customer);
-
-		const isVeridaDid = new VeridaDIDValidator().validate(subjectDid);
-		if (
-			ENABLE_VERIDA_CONNECTOR === 'true' &&
-			connector === CredentialConnectors.Verida &&
-			isVeridaDid.valid &&
-			isVeridaDid.namespace
-		) {
-			if (!credentialSchema) throw new Error('Credential schema is required');
-
-			// dynamic import to avoid circular dependency
-			const { VeridaService } = await import('../connectors/verida.js');
-
-			await VeridaService.instance.sendCredential(
-				isVeridaDid.namespace,
-				subjectDid,
-				'New Verifiable Credential',
-				verifiable_credential,
-				credentialName || v4(),
-				credentialSchema,
-				credentialSummary
-			);
-		} else if (connector && connector === CredentialConnectors.Resource) {
+		
+		if (connector && connector === CredentialConnectors.Resource) {
 			await ResourceConnector.instance.sendCredential(
 				customer,
 				issuerDid,
